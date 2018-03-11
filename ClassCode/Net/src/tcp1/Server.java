@@ -1,6 +1,11 @@
 package tcp1;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
 
@@ -33,11 +38,43 @@ public class Server {
 	 */
 	public void listener() {
 		while (true) {
+			Socket sc=null;
 			try {
-				Socket sc = ss.accept();
+				sc = ss.accept();
 				System.out.println("有客户端连接进来，" + sc);
+				
+				//与客户端通信
+				InputStream in=sc.getInputStream();
+				OutputStream out=sc.getOutputStream();
+				
+				//InputStream->Reader
+				InputStreamReader reader=new InputStreamReader(in);
+				BufferedReader br =new BufferedReader(reader);
+				
+				PrintWriter pw=new PrintWriter(out,true);
+				
+				String content=null;
+				while((content=br.readLine())!=null) {
+					System.err.println("从客户端接收到的消息，"+content);
+					
+					//将消息回发给客户端
+					pw.println("您好："+sc.getInetAddress()+"-"+content);
+					
+					if("bye".equals(content)) {
+						break;
+					}
+				}
+				
 			} catch (IOException e) {
 				e.printStackTrace();
+			}finally {
+				if(sc!=null) {
+					try {
+						sc.close();
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
+				}
 			}
 		}
 	}
