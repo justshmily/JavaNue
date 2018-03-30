@@ -8,6 +8,7 @@ public class RuntimeDemo {
 		Runtime run=Runtime.getRuntime();
 		run.exec("calc");
 		run.exec("notepad");
+		
 	}
 
 }
