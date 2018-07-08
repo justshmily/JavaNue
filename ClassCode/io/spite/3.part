@@ -1,0 +1,855 @@
+ul id="mMenu"><li><a href="javascript:;" name="ime_hw">手写</a></li><li><a href="javascript:;" name="ime_py">拼音</a></li><li class="ln"></li><li><a href="javascript:;" name="ime_cl">关闭</a></li></ul></span></span><input type="hidden" name="oq" value="陈翔工作室声明"><input type="hidden" name="rsv_pq" value="9fa86d4b000023d8"><input type="hidden" name="rsv_t" value="0027Op46jRG4aPoNWdf8vsiB3uH6IOw6k3OgsrNZ+iXT0CWIVa8rFVyg7nLYZB7TthPr"><input type="hidden" name="rqlang" value="cn"></form><div id="m"></div></div></div><div id="u"><a class="toindex" href="/">百度首页</a><a id="imsg" href="http://www.baidu.com/#"  onmousedown="return user_c({'fm':'set','tab':'imsg','login':'1'})">消息</a><a href="javascript:;" name="tj_settingicon" class="pf">设置<i class="c-icon c-icon-triangle-down"></i></a><a href="http://i.baidu.com" id="user" class="username">糖葫芦642<i class="c-icon"></i></a></div><div id="u1"><a href="http://news.baidu.com" name="tj_trnews" class="mnav">新闻</a><a href="http://www.hao123.com" name="tj_trhao123" class="mnav">hao123</a><a href="http://map.baidu.com" name="tj_trmap" class="mnav">地图</a><a href="http://v.baidu.com" name="tj_trvideo" class="mnav">视频</a><a href="http://tieba.baidu.com" name="tj_trtieba" class="mnav">贴吧</a><a href="http://xueshu.baidu.com" name="tj_trxueshu" class="mnav">学术</a><a href="http://i.baidu.com" class="username">糖葫芦642</a><a href="http://www.baidu.com/gaoji/preferences.html" name="tj_settingicon" class="pf">设置</a><a href="http://www.baidu.com/more/" name="tj_briicon" class="bri" style="display: block;">更多产品</a></div></div></div>
+
+
+<script>
+/**
+ * @description 图片base64加载
+ * @author lizhouquan
+ */
+
+
+bds.base64 = (function () {
+	//获取base64前置参数
+	var _opt = bds._base64;
+
+	//内部数据;
+    var _containerAllId = "container",
+        _containerLeftId = "content_left",
+        _containerRightId = "content_right",
+		_BOTTAGLSNAME = "BASE64_BOTTAG",
+        _domain = bds._base64.domain,   //base64图片服务域名
+        _imgWatch = [],             //图片加载观察list，如果没有onload，进行容错
+        _domLoaded = [],            //标识对应dom是否已下载
+        _data = [],                 //暂存请求回调数据
+        _dataLoaded = [],        //数据是否返回
+        _finish = [],            //是否已完成渲染
+        _hasSpImg = false,          //是否有左侧模板sp_img走base64加载
+        _expGroup = 0,              //左侧实验组
+        _reqTime = 0,              //请求开始时间
+        _reqEnd = 0,               //请求返回时间 - 右侧
+        _reqEndL = 0,               //请求返回时间 - 左侧
+        _rsst = 0,              	//请求开始时间 - 测速
+        _rest = 0,               	//请求返回时间 - 测速
+        _dt = 1,                   //domain类型
+		_loadState = {},		   //记录imglist的状态
+		_hasPreload = 0,		   //记录页面是否开启preload
+        _ispdc = false;            //是否开启了性能统计
+
+	//异步下发起下次搜索时重置变量
+	var preXhrs = [],$ = window.$;
+	if($) {
+		$(window).on("swap_begin",function(){
+			_imgWatch = [];             //图片加载观察list，如果没有onload，进行容错
+			_domLoaded = [];            //标识对应dom是否已下载
+			_data = [];                 //暂存请求回调数据
+			_dataLoaded = [];        //数据是否返回
+			_finish = [];            //是否已完成渲染
+			_hasSpImg = false;          //是否有左侧模板sp_img走base64加载
+			_expGroup = 0;              //左侧实验组
+			_reqTime = 0;              //请求开始时间
+			_reqEnd = 0;               //请求返回时间 - 右侧
+			_reqEndL = 0;               //请求返回时间 - 左侧
+			_rsst = 0;                  //请求开始时间 - 测速
+			_rest = 0;                  //请求返回时间 - 测速
+			_dt = 1;                   //domain类型
+			_ispdc = false;            //是否开启了性能统计
+
+			//停止正在执行的base64回调操作
+			for(var i = 0 ; i < preXhrs.length; i++) {
+				preXhrs[i].abort();
+			}
+		});
+	}
+
+
+    //初始化方法
+    var init = function(imgRight,imgLeft,isPreload){
+        var imgArr = imgRight || [], imgArr2 = imgLeft || [];
+        if(window.__IS_IMG_PREFETCH){
+            //异步base64去重
+            function filter(img){
+                return !window.__IS_IMG_PREFETCH.hasOwnProperty(img);
+            }
+            imgArr=$.grep(imgArr,filter);
+            imgArr2=$.grep(imgArr2,filter);
+        }
+		if(window.__IMG_PRELOAD && isPreload) {
+			//定义loadState，防止callback乱序
+			_loadState["cbr"] = 0;
+			_loadState["cbpr"] = 0;
+
+			_hasPreload = 1; //标记页面中有预取
+
+			var imgPreloadList = window.__IMG_PRELOAD = {};
+			for(var i = 0; i < imgArr.length; i++) {
+			   	if(!imgPreloadList.hasOwnProperty(imgArr[i])) {
+					window.__IMG_PRELOAD[imgArr[i]] = true;
+				}
+			}
+		} else if(window.__IMG_PRELOAD && !isPreload) {
+			//同步base64右侧去重
+			var tmpArr = [];
+			for(var i = 0; i < imgArr.length; i++){
+			   	if(!window.__IMG_PRELOAD.hasOwnProperty(imgArr[i])) {
+					tmpArr.push(imgArr[i]);
+				}
+			}
+			imgArr = tmpArr;
+			//TODO
+			//提取出函数
+		}
+		if(_opt.b64Exp) {
+			_expGroup = _opt.b64Exp;
+			if(_expGroup == 1){
+				_domain = "http://b2.bdstatic.com/"; /*base64 new domain sample deploy*/
+				_dt = 2;
+			}
+		}
+        _ispdc= _opt.pdc>0 ? true : false;
+		_reqTime = new Date()*1;
+		if(_expGroup==2){
+			//左右分别发请求
+			if(imgArr2.length>0){
+				_hasSpImg = true;
+				loadJs(_domain + "image?imglist=" + imgArr2.join(",") + "&cb=bds.base64.cbl");
+			}
+			if(!isPreload) {
+				cbl({});
+			}
+		}
+		if(imgArr.length>0){
+			//发送请求
+			if(isPreload) {
+				loadJs(_domain + "image?imglist=" + imgArr.join(",") + "&cb=bds.base64.cbpr");
+			} else {
+				loadJs(_domain + "image?imglist=" + imgArr.join(",") + "&cb=bds.base64.cbr");
+			}
+			if(_ispdc){
+                if(bds.ready){
+                    bds.ready(function(){
+                        setTimeout(function(){
+                            var _bottag = botTag.get();
+                            var logstr = "dt=" + _dt + "&time=" + ((_reqEnd>0)?(_reqEnd-_reqTime):0) + "&bot=" + _bottag + "&rcount=" + imgArr.length;
+                            window._B64_REQ_LOG = ((_reqEnd>0)?(_reqEnd-_reqTime):0) + "_" + imgArr.length;
+                            if(_expGroup==2 && _reqEndL>0){
+                                var _apics = document.getElementById("ala_img_pics");
+                                var _lcount = (_apics&&_apics.children)?_apics.children.length:0;
+                                logstr += "&time2=" + (_reqEndL-_reqTime) + "&lcount=" + _lcount;
+                            }
+                            if(Math.random()*100<10){
+                                sendLog(logstr);
+                            }
+                        }, 2000);
+                    });
+                }
+			}
+		} else {
+			if(!isPreload) {
+				cbr({});
+			}
+		}
+		if(imgArr.length>0 || imgArr2.length>0){
+			if(!isPreload) {
+				watchReq(imgArr.length);
+			}
+		}
+    };
+
+    //异步加载js
+    function crc32 (str) {
+        if(typeof str=="string"){
+            var i,crc=0,j=0;
+            for(i=0;i<str.length;i++){
+                j=i%20+1;
+                crc+=str.charCodeAt(i)<<j;
+            }
+            return Math.abs(crc);
+        }
+        return 0;
+    }
+    var loadJs = function (url) {
+        var matchs = url.match(/.*(bds\.base64\.cb[rl])/);
+        if(!matchs){
+            return;
+        }
+        var imglist=url.match(/imglist=([^&]*)/);
+        if(!imglist||!imglist[1]){
+            return;
+        }
+        //see b64_base_popstate.js, this just sync result page
+        callback_name=crc32(imglist[1].replace(/,/g,""));
+        callback_name="cb_"+(callback_name+"").substr(Math.max(0,callback_name.length-8),8)+"_0";
+        window[callback_name]=function(data){
+            if(matchs[1] == "bds.base64.cbr") {
+                cbr(data);
+            }else if(matchs[1] == "bds.base64.cbl") {
+                cbl(data);
+            }
+            window[callback_name]=null;
+        };
+        var url = matchs[0].replace(/bds\.base64\.cb[rl]/,callback_name);
+
+        var a = document.createElement("script");
+        a.setAttribute("type", "text/javascript");
+        a.setAttribute("src", url);
+        a.setAttribute("defer", "defer");
+        a.setAttribute("async", "true");
+        document.getElementsByTagName("head")[0].appendChild(a);
+    };
+
+    //图片回填
+    var imgLoad = function(data,side){
+        if(_finish[side]){
+            return;
+        }
+        _finish[side] = true;
+		if(side=="right"){
+			botTag.ot(false); //设置超时标记减1.
+		}
+        //获取所有图片，通过data-base64-id属性获取需要回填的图片
+        var imgs = document.getElementById(_expGroup!=1?((side=="left")?_containerLeftId:_containerRightId):_containerAllId).getElementsByTagName("IMG");
+        for(var i=0;i<imgs.length;i++){
+            var b64Id = imgs[i].getAttribute("data-b64-id");
+            if(b64Id){
+                var find = false;
+				if(data.hasOwnProperty(b64Id)) {
+                    setSrc(imgs[i],data[b64Id]);
+					find = true;
+				}
+                if(!find){
+                    //小容错
+                    failover(imgs[i]);
+                }
+            }
+        }
+        fail_ie7();
+    };
+    function fail_ie7(){
+        //外层容错 IE7
+        setTimeout(function(){
+            for( var i=0; i<_imgWatch.length; i++ ){
+                var n = _imgWatch[i];
+                if(!n.loaded){
+                    failover(n.obj);
+                }
+            }
+            _imgWatch=[];
+        },200);
+    }
+    function setSrc(img,data){
+        try{
+            img.onerror = function(){
+                failover(this);
+            };
+
+            //标记监视，供容错检查
+            _imgWatch.push({
+                obj:img,
+                loaded:false
+            });
+
+            img.onload = function(){
+                //标记已加载
+                for( var i=0; i<_imgWatch.length; i++ ){
+                    var m = _imgWatch[i];
+                    if(m.obj == this){
+                        m.loaded = true;
+                    }
+                }
+            };
+            img.src = "data:image\/jpeg;base64," + data;
+        }catch(e){
+            //触发exception
+            failover(img);
+        }
+    }
+
+    //容错，回填原始src
+    var failover = function(img){
+        if(img.getAttribute("data-b64-id")!=null && img.getAttribute("data-b64-id")!="" && img.getAttribute("data-src")!=null){
+            img.src = img.getAttribute("data-src");
+        }
+    };
+
+    var watchReq = function(len){
+        var wt = 1250;
+        if(len<6){
+            wt = 1000;
+        }else if(len>10){
+            wt = 1500;
+        }
+        setTimeout(function(){
+            if( !_dataLoaded["right"] ){
+                var imgs = document.getElementById(_containerRightId).getElementsByTagName("IMG");
+                for(var i=0;i<imgs.length;i++){
+                    failover(imgs[i]);
+                }
+				_finish["right"] = true;
+				//设置超时标记
+				botTag.ot(true);
+            }
+			setTimeout(function(){
+				if(_hasSpImg && !_dataLoaded["left"]){
+                	var imgs = document.getElementById(_containerLeftId).getElementsByTagName("IMG");
+                	for(var i=0;i<imgs.length;i++){
+                    	failover(imgs[i]);
+               		}
+					_finish["left"] = true;
+            	}
+			},500);
+        },wt);
+    };
+
+	/**
+	 * base64网速检测标记
+	 *   超时次数变量 BOT
+	 *   初始：0
+	 *   范围：0-6
+	 *   变换规则：
+	 *       每次超时，BOT +1;
+	 * 		 每次正常：BOT -1;
+	 *       到达边界值时，不再继续增加/减少
+	 *	 如何使用：（未上线）
+	 *   	 BOT大于3时，设置cookie: B64_BOT=1，VUI针对本次请求，读cookie，如果B64_BOT=1，关闭base64服务
+	 *       当BOT小于3时，设置cookie: B64_BOT=0，VUI正常开启base64服务。
+	 */
+	var botTag = {
+		ot : function(isInc){
+			var _bottag = botTag.get();
+			if(isInc){
+				if(_bottag<6){
+					_bottag++;
+				}
+			}else{
+				if(_bottag>0){
+					_bottag--;
+				}
+			}
+			if( _bottag>=2 ){
+				var date = new Date();
+				date.setTime(date.getTime() + 24*3600*1000*5);
+				//此处设置cookie
+				document.cookie = "B64_BOT=1; expires=" + date.toGMTString();
+				//_bottag = 0;
+			}else if( _bottag<1 ){
+			    if(document.cookie.match('B64_BOT=1')){
+					document.cookie = "B64_BOT=0;";
+				}
+			}
+			try{
+				if(window.localStorage){
+					window.localStorage[_BOTTAGLSNAME] = _bottag;
+				}
+			}catch(e){}
+		},
+		get : function(){
+			try{
+				if(window.localStorage){
+					var _bottag = window.localStorage[_BOTTAGLSNAME];
+						_bottag = _bottag?parseInt(_bottag):0;
+				}else{
+					return 0;
+				}
+				return _bottag;
+			}catch(e){
+				return 0;
+			}
+		}
+	};
+
+    //请求回调方法 - 右侧
+    var cbr = function(data){
+        _reqEnd = new Date()*1;
+        if(_ispdc && bds.comm && _reqTime>0 && _reqEnd>0){
+            bds.comm.cusval = "b64_" + _dt + "_" + ( _reqEnd - _reqTime );
+        }
+		_loadState["cbr"] = 1;
+        callback(data, "right");
+    };
+
+    //请求回调方法 - 左侧
+    var cbl = function(data){
+		_reqEndL = new Date()*1;
+        callback(data, "left");
+    };
+
+    //请求回调方法 - 预取
+    var cbpr = function(data){
+		_loadState["cbpr"] = 1;
+        callback(data, "right");
+    };
+
+	var callback = function(data, side){
+		_dataLoaded[side] = _hasPreload ? (_loadState.cbpr && _loadState.cbr) : true;
+
+		if(data) {
+			if(_data[side] === undefined) {_data[side] = {}};
+			for(var key in data) {
+				if(data.hasOwnProperty(key)) {
+					_data[side][key] = data[key];
+				}
+			}
+        }
+        if(_domLoaded[side] && _dataLoaded[side]){
+            imgLoad(_data[side], side);
+        }
+    };
+
+    //设置Dom加载完成
+    var setDomLoad = function(side){
+        _domLoaded[side] = true;
+        if(_dataLoaded[side]){
+            imgLoad(_data[side],side);
+        }
+    };
+
+	var predictImg = false; //右侧base64图片是否预取
+
+	//发送日志
+    var sendLog = function (src) {
+        var loghost = "http://nsclick.baidu.com/v.gif?pid=315&rsv_yc_log=3&";
+
+        var n = "b64log__" + (new Date()).getTime(),
+            c = window[n] = new Image();
+            c.onload = (c.onerror = function () {
+                window[n] = null;
+            });
+        c.src = loghost + src + "&_t=" + new Date()*1; //LOG统计地址
+        c = null; //释放变量c，避免产生内存泄漏的可能
+    };
+
+
+	//定义测速函数:
+	//请求回调 - 测速
+	cbs = function(data){
+		_rest = new Date()*1;
+		if( (_rest - _rsst) < 1500 ){
+			botTag.ot(false);
+		}else{
+			botTag.ot(true);
+		}
+	};
+
+	//测试速度
+	ts = function(){
+		_expGroup = 3;
+		_rsst = new Date()*1;
+		loadJs(_domain + "image?imglist=1241886729_3226161681_58,1072899117_2953388635_58,2469877062_2085031320_58,155831992_309216365_58,2539127170_1607411613_58,1160777122_283857721_58,1577144716_3149119526_58,2339041784_1038484334_58&cb=bds.base64.cbs");
+	};
+
+    return {
+        init : init,
+        cbl : cbl,
+        cbr : cbr,
+        cbpr : cbpr,
+        setDomLoad : setDomLoad,
+		cbs : cbs,
+		ts : ts,
+		predictImg : predictImg
+    }
+})();
+
+</script>
+
+<script>
+/* 图片预取、base64预取代码 */
+
+</script>
+
+			
+
+<!--cxy_all+monline_3_dg+1d351ca0a89c3942c976b33f66a29e8b+000000000000000000000000000000000113022-->
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+					        
+		
+										
+
+		
+
+
+
+		
+		
+
+
+
+
+
+	
+        
+			        
+	
+			        
+	
+			        
+	
+			        
+			    
+
+	
+        
+			        
+	
+			        
+	
+			        
+	
+			        
+			    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+			
+
+		
+            
+	            
+    <div class="s_tab" id="s_tab"><b>网页</b><a href="http://news.baidu.com/ns?cl=2&rn=20&tn=news&word=%B3%C2%CF%E8%B9%A4%D7%F7%CA%D2%C9%F9%C3%F7" wdfield="word"  onmousedown="return c({'fm':'tab','tab':'news'})">新闻</a><a href="http://tieba.baidu.com/f?fr=wwwt&kw=%B3%C2%CF%E8%B9%A4%D7%F7%CA%D2%C9%F9%C3%F7" wdfield="kw"  onmousedown="return c({'fm':'tab','tab':'tieba'})">贴吧</a><a href="http://zhidao.baidu.com/q?ct=17&pn=0&tn=ikaslist&rn=10&fr=wwwt&word=%B3%C2%CF%E8%B9%A4%D7%F7%CA%D2%C9%F9%C3%F7" wdfield="word"  onmousedown="return c({'fm':'tab','tab':'zhidao'})">知道</a><a href="http://music.baidu.com/search?fr=ps&ie=utf-8&key=%B3%C2%CF%E8%B9%A4%D7%F7%CA%D2%C9%F9%C3%F7" wdfield="key"  onmousedown="return c({'fm':'tab','tab':'music'})">音乐</a><a href="http://image.baidu.com/i?tn=baiduimage&ps=1&ct=201326592&lm=-1&cl=2&nc=1&ie=utf-8&word=%B3%C2%CF%E8%B9%A4%D7%F7%CA%D2%C9%F9%C3%F7" wdfield="word"  onmousedown="return c({'fm':'tab','tab':'pic'})">图片</a><a href="http://v.baidu.com/v?ct=301989888&rn=20&pn=0&db=0&s=25&ie=utf-8&word=%B3%C2%CF%E8%B9%A4%D7%F7%CA%D2%C9%F9%C3%F7" wdfield="word"  onmousedown="return c({'fm':'tab','tab':'video'})">视频</a><a href="http://map.baidu.com/m?fr=ps01000&word=%B3%C2%CF%E8%B9%A4%D7%F7%CA%D2%C9%F9%C3%F7" wdfield="word"  onmousedown="return c({'fm':'tab','tab':'map'})">地图</a><a href="http://wenku.baidu.com/search?lm=0&od=0&ie=utf-8&word=%B3%C2%CF%E8%B9%A4%D7%F7%CA%D2%C9%F9%C3%F7" wdfield="word"  onmousedown="return c({'fm':'tab','tab':'wenku'})">文库</a><a href="http://www.baidu.com/more/"  onmousedown="return c({'fm':'tab','tab':'more'})">更多»</a></div>
+
+
+	            
+    
+
+	           	<div id="wrapper_wrapper">
+				
+	
+			
+	
+		<!--[if IE 8]>
+		<style>
+		   .c-input input{padding-top:4px;}
+		</style>
+		<![endif]-->
+		
+			<style>
+			    											 .op_sp_realtime_bigpic5_img_con{position:relative}.op_sp_realtime_bigpic5_subTitle_0{font-size:1.69em;font-family:Microsoft YaHei;font-weight:400;line-height:22px}.op_sp_realtime_bigpic5_imgTitle{text-decoration:none;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;position:absolute;bottom:0;left:0;width:100%;color:#fff;height:30px;line-height:31px;text-indent:10px;filter:progid:DXImageTransform.Microsoft.gradient(enabled='true', startColorstr='#99000000', endColorstr='#99000000');background-color:rgba(0,0,0,.6)}:root .op_sp_realtime_bigpic5_imgTitle{filter:none;background-color:rgba(0,0,0,.6)}.op_sp_realtime_bigpic5_imgTitle span:hover{text-decoration:underline}.op_sp_realtime_bigpic5_img_con_icon{position:absolute;top:0;right:0;padding:5px}.op_sp_realtime_bigpic5_first_abs{text-indent:2em}.op_sp_realtime_bigpic5_list{padding-top:6px}.op_sp_realtime_bigpic5_list div{line-height:1.7}.op_sp_realtime_bigpic5_list_last span{padding-bottom:5px}.op_sp_realtime_bigpic5_list_date{float:left;padding-right:10px;*padding-right:0;margin-right:8px;border-right:1px solid #ddd;display:inline}.op_sp_realtime_bigpic5_list_info{clear:right}.op_sp_realtime_bigpic5_more-cont-date{display:block;position:relative}.op_sp_realtime_bigpic5_more-cont-dot{display:inline-block;width:5px;height:12px;position:absolute;right:-13px;*right:-3px;_right:-2px;top:4px;*top:0;background:#fff url(//www.baidu.com/aladdin/img/right_timeline/timeline-1.1.png) no-repeat -59px 0;_background-position:-58px 0}.op_sp_realtime_bigpic5_more-cont-date{float:right;width:65px;text-align:right;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.op_sp_realtime_bigpic5_subTitle_con{text-overflow:ellipsis;white-space:nowrap;width:100%}.op_sp_realtime_bigpic5_preBox{text-decoration:none;position:relative;overflow:hidden}.op_sp_realtime_bigpic5_preBox img{vertical-align:top;float:left;height:81px}.op_sp_realtime_bigpic5_preBox b,.op_sp_realtime_bigpic5_preBox span{display:block;position:absolute;bottom:0;left:1px;height:20px;cursor:pointer}.op_sp_realtime_bigpic5_preBox span{display:block;background:#000;opacity:.65;filter:alpha(opacity=65);width:119px}.op_sp_realtime_bigpic5_preBox b{font:400 13px/20px arial;color:#fff;background:url(//www.baidu.com/aladdin/img/sp_realtime/play-1.0.png) no-repeat 4px center;padding-left:20px}.opr-toplist-title{position:relative}.opr-toplist-table .opr-toplist-right{text-align:right;white-space:nowrap}.opr-toplist-info{color:#666;text-align:right}.opr-toplist-info a{color:#666}.opr-toplist-st{margin-bottom:2px}.container_s #content_right .opui-advert2-img-big{width:259px;_height:70px}.container_l #content_right .opui-advert2-img-big{_width:351px;_height:95px}.opr-toplist-more{position:absolute;right:-10px;top:0}.opr-toplist-more-currentBtn{color:#666}.opr-toplist-more-chevron{padding:10px;cursor:pointer}.opr-toplist-more-chevron-left{padding-right:2px}.opr-toplist-more-chevron-right{padding-left:2px}.opr-toplist-more-btn{display:inline-block;width:4px;height:4px;margin:0 3px;*margin-top:-8px;overflow:hidden;background:url(//www.baidu.com/aladdin/tpl/right_toplist/toplist_dot.png) -4px 0 no-repeat}.opr-toplist-more-currentBtn{background-position:0 0}
+								    			</style>
+		
+
+			
+
+				
+	 <script id="head_script">
+        bds.comm.newagile = "1";
+        bds.comm.jsversion = "006";
+ 		bds.comm.domain = "http://www.baidu.com";
+        bds.comm.ubsurl = "https://sp0.baidu.com/5bU_dTmfKgQFm2e88IuM_a/union.gif";
+        bds.comm.tn = "monline_3_dg";
+        bds.comm.tng = "union";
+        bds.comm.queryEnc = "%B3%C2%CF%E8%B9%A4%D7%F7%CA%D2%C9%F9%C3%F7";
+        bds.comm.queryId = "9fa86d4b000023d8";
+        bds.comm.inter = "";
+        bds.comm.resTemplateName = "baidulm";
+        bds.comm.sugHost = "https://sp0.baidu.com/5a1Fazu8AA54nxGko9WTAnF6hhy/su";
+        bds.comm.ishome = 0;
+        bds.comm.query = "陈翔工作室声明";
+        bds.comm.qid = "9fa86d4b000023d8";
+        bds.comm.eqid = "9fa86d4b000023d8000000065a69cc83";	//eclipse项目使用
+        bds.comm._se_click_track_flag = "";	//点击日志追查使用
+        bds.comm.cid = "0";
+        bds.comm.sid = "1431_21124_22157";
+        bds.comm.sampleval = [];// 通用抽样标记
+        bds.comm.stoken = "7a97c66606ad82c8668712e915a3ccbd";
+        bds.comm.serverTime = "1516883075";
+        bds.comm.user = "糖葫芦642";
+        bds.comm.username = "糖葫芦642";
+        bds.comm.userid = "2158839516";
+		bds.comm.__rdNum = "1652";
+        bds.comm.useFavo = "";
+        bds.comm.pinyin = "chenxianggongzuoshishengming";
+        bds.comm.favoOn = "";
+        bds.comm.speedInfo = "[{\"ModuleId\":9537,\"TimeCost\":157.12,\"TimeSelf\":12.2},{\"ModuleId\":9540,\"TimeCost\":-1,\"TimeSelf\":-1,\"Idc\":\"6\"},{\"ModuleId\":9527,\"TimeCost\":141.69,\"TimeSelf\":34.03,\"isHitCache\":true,\"SubProcess\":[{\"ProcessId\":9531,\"TimeCost\":0,\"isHitCache\":true},{\"ProcessId\":9536,\"TimeCost\":89.11,\"isHitCache\":false},{\"ProcessId\":9535,\"TimeCost\":18.12,\"isHitCache\":false},{\"ProcessId\":9532,\"TimeCost\":89.53}]}]";
+        bds.comm.topHijack = null;
+        bds.comm.isDebug = false;
+				bds.comm.personalData = {"sugSet":{"value":"","ErrMsg":"NOFOUND"},"sugStoreSet":{"value":"","ErrMsg":"NOFOUND"},"skinName":{"value":"","ErrMsg":"NOFOUND"},"fullSkinName":{"value":"","ErrMsg":"NOFOUND"},"customOpacity":{"value":"","ErrMsg":"NOFOUND"},"skinHistory":{"value":"","ErrMsg":"NOFOUND"},"customLogo":{"value":"","ErrMsg":"NOFOUND"},"isSuper":{"value":"","ErrMsg":"NOFOUND"},"lastUploadPic":{"value":"","ErrMsg":"NOFOUND"},"userCards":{"value":"","ErrMsg":"NOFOUND"},"curCard":{"value":"","ErrMsg":"NOFOUND"},"delCard":{"value":"","ErrMsg":"NOFOUND"},"click_site":{"value":"","ErrMsg":"NOFOUND"},"xingzuo":{"value":"","ErrMsg":"NOFOUND"},"use_firstcard":{"value":"","ErrMsg":"NOFOUND"},"soccer":{"value":"","ErrMsg":"NOFOUND"},"worldcup_str":{"value":"","ErrMsg":"NOFOUND"},"worldcup_reward":{"value":"","ErrMsg":"NOFOUND"},"worldcup_win":{"value":"","ErrMsg":"NOFOUND"},"showAllTab":{"value":"","ErrMsg":"NOFOUND"},"lotterytab":{"value":"","ErrMsg":"NOFOUND"},"stock":{"value":"","ErrMsg":"NOFOUND"},"skinOpacity":{"value":"","ErrMsg":"NOFOUND"},"worldcup_extra":{"value":"","ErrMsg":"NOFOUND"},"closeCardSceneRec":{"value":"","ErrMsg":"NOFOUND"},"imeSwitch":{"value":"","ErrMsg":"NOFOUND"},"resultNum":{"value":"","ErrMsg":"NOFOUND"},"resultLang":{"value":"","ErrMsg":"NOFOUND"},"isSwitch":{"value":"","ErrMsg":"NOFOUND"},"scholarMessage":{"value":"","ErrMsg":"NOFOUND"},"skinOpen":{"value":"","ErrMsg":"NOFOUND"},"pdSearch":{"value":"","ErrMsg":"NOFOUND"},"scholarStatusNo":{"value":"","ErrMsg":"NOFOUND"},"searchsubclose":{"value":"","ErrMsg":"NOFOUND"},"cardsFrom":{"value":"","ErrMsg":"NOFOUND"},"scholarUserLevel":{"value":"","ErrMsg":"NOFOUND"},"isJumpHttps":{"value":"","ErrMsg":"NOFOUND"},"duRobotState":{"value":"","ErrMsg":"NOFOUND"},"city_weather":{"value":"","ErrMsg":"NOFOUND"},"switchHttps":{"value":"","ErrMsg":"NOFOUND"},"switchUpload":{"value":"","ErrMsg":"NOFOUND"},"errno":0,"trafficSet":{"value":"","ErrMsg":"NOFOUND"},"scholarLib":{"value":"","ErrMsg":"NOFOUND"},"yaohaoSet":{"value":"","ErrMsg":"NOFOUND"}};
+		
+        
+        
+        
+        
+                                                                                                                                                            
+        bds.comm.iaurl=["http:\/\/news.yongkao.com\/jiaodian\/48295.html","http:\/\/do.chinabyte.com\/hot\/373\/14423873.shtml","http:\/\/www.sjzcmw.com\/news\/star\/120453.html"];
+
+		bds.comm.curResultNum = "10";
+    	bds.comm.rightResultExist = false;
+    	bds.comm.protectNum = 0;
+    	bds.comm.zxlNum = 0;
+        bds.comm.pageNum = parseInt('1')||1;
+
+		
+        bds.comm.pageSize = parseInt('10')||10;
+	bds.comm.encTn = 'df36QUkmn3Q2lMmPx+oula0GfcXdCNNlcr9vb8V+riTn4+waWP8eGhMIc7qIGdp2Xin4';
+		//base64实验变量
+		
+        //防止从结果页打开的页面中通过opener.xxx来影响百度页面
+
+        bds.se.mon = {'loadedItems':[],'load':function(){},'srvt':-1};
+        try {
+            bds.se.mon.srvt = parseInt(document.cookie.match(new RegExp("(^| )BDSVRTM=([^;]*)(;|$)"))[2]);
+            document.cookie="BDSVRTM=;expires=Sat, 01 Jan 2000 00:00:00 GMT";
+        }catch(e){
+            bds.se.mon.srvt=-1;
+        }
+
+        //兼容之前一些变量
+
+        bdUser        = bds.comm.user?bds.comm.user:null;
+        bdQuery       = bds.comm.query;
+        bdUseFavo     = bds.comm.useFavo;
+        bdFavoOn      = bds.comm.favoOn;
+        bdCid         = bds.comm.cid;
+        bdSid         = bds.comm.sid;
+        bdServerTime  = bds.comm.serverTime;
+        bdQid         = bds.comm.queryId;
+        bdstoken      = bds.comm.stoken;
+		_eclipse = "1";	//eclipse开关，暂时放这里
+        login_success = [];
+
+        bds.comm.seinfo = {'fm':'se','T':'1516883075','y':'B9DE93DD','rsv_cache': (bds.se.mon.srvt>0)?0:1 };
+        bds.comm.cgif = "https://sp0.baidu.com/9foIbT3kAMgDnd_/c.gif?t=0&q=%B3%C2%CF%E8%B9%A4%D7%F7%CA%D2%C9%F9%C3%F7&p=0&pn=1";
+
+		bds.comm.upn = {"browser":"firefox","os":"windows","win":"win10","browsertype":"firefox"};
+        bds.comm.cookie = {"BAIDUID":"08EA15BB53D9527CFED53C58C57FE398:FG=1","BIDUPSID":"08EA15BB53D9527CFED53C58C57FE398","PSTM":"1516254551","BD_UPN":"13314752","BDORZ":"FFFB88E999055A3F8A630C64834BD6D0","BDRCVFR":{"Fc9oatPmwxn":"srT4swvGNE6uzdhUL68mv3"},"BD_CK_SAM":"1","PSINO":"7","H_PS_PSSID":"1431_21124_22157","pgv_pvi":"7043806208","pgv_si":"s4690413568","BDSVRTM":"0"};
+
+        // url右侧推荐白名单标志 urlRecFlag=1:不请求推荐浮层数据，urlRecFlag=0:请求推荐浮层数据
+                    bds.comm.urlRecFlag = "0";
+                
+                    bds.comm.bfe_sample=null;
+        
+        // 右侧广告定时变化开关
+        // !!!!!!注意上线过程新首页静态文件与模版不一致问题!!!!!!看不懂请勿随意修改!!!!!!
+
+        
+
+		    </script>
+
+		<script>
+if( bds.ready && document.cookie.match('B64_BOT=1') ){
+    bds.ready(function(){
+	    setTimeout(function(){
+			if( bds.base64 && bds.base64.ts ){
+				bds.base64.ts();
+			}
+		},2000)
+	})
+}
+</script>
+
+	
+	            <div id="container" class="container_s">
+	                <script>
+	                    bds.util.setContainerWidth();
+	                    bds.ready(function(){
+	                        $(window).on("resize",function(){
+	                            bds.util.setContainerWidth();
+	                            bds.event.trigger("se.window_resize");
+	                        });
+	                        bds.util.setContainerWidth();
+	                    });
+	                </script>
+			
+
+			
+
+	
+	
+	    <div id="content_right" class="cr-offset">
+        <table cellpadding="0" cellspacing="0"><tr>
+            <td align="left">
+	        
+	
+	
+  		    
+  	        
+
+
+  		    
+            
+	
+
+            <div id="con-ar" class=result_hidden>
+                                            
+	                                
+
+        <div class="result-op xpath-log" tpl="right_toplist" data-click='{"fm":"alxr","p1":1,"mu":"http:\/\/top.baidu.com\/buzz?b=1","rsv_stl":"0","rsv_srcid":20811}'> 
+
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                                                
+              
+
+    
+    
+
+
+<div class="cr-content ">
+    
+
+<div>
+    <div class="cr-title c-gap-bottom opr-toplist-title" title="搜索热点">
+            	<div class="opr-toplist-more" data-click="{fm:'beha'}"><span  class="OP_LOG_BTN opr-toplist-more-chevron opr-toplist-more-chevron-left"><i class="c-icon c-icon-chevron-left-gray"></i></span><span class="opr-toplist-more-currentBtn  opr-toplist-more-btn"></span><span class="  opr-toplist-more-btn"></span><span class="  opr-toplist-more-btn"></span><span class="OP_LOG_BTN opr-toplist-more-chevron opr-toplist-more-chevron-right"><i class="c-icon c-icon-chevron-right"></i></span></div>
+        搜索热点
+    </div>
+    <table class="c-table opr-toplist-table">
+    	<thead>
+        <tr>
+            <th>排名</th>
+            <th class="opr-toplist-right">搜索指数</th>
+        </tr>
+        </thead>
+        
+                <tbody >        <tr >
+                                                            <td><span><span class="c-index  c-index-hot1 c-gap-icon-right-small">1</span><a target="_blank" title="茅侃侃家中自杀" href="/s?tn=monline_3_dg&wd=%E8%8C%85%E4%BE%83%E4%BE%83%E5%AE%B6%E4%B8%AD%E8%87%AA%E6%9D%80&usm=1&ie=utf-8&rsv_cq=%E9%99%88%E7%BF%94%E5%B7%A5%E4%BD%9C%E5%AE%A4%E5%A3%B0%E6%98%8E&rsv_dl=0_right_toplist_20811">茅侃侃家中自杀</a></span></td>
+            <td class="opr-toplist-right">499100<i class="opr-toplist-st c-icon c-icon-up"></i></td>
+        </tr>
+                                <tr >
+                                                            <td><span><span class="c-index  c-index-hot2 c-gap-icon-right-small">2</span><a target="_blank" title="十年花近百万养蛙" href="/s?tn=monline_3_dg&wd=%E5%8D%81%E5%B9%B4%E8%8A%B1%E8%BF%91%E7%99%BE%E4%B8%87%E5%85%BB%E8%9B%99&usm=1&ie=utf-8&rsv_cq=%E9%99%88%E7%BF%94%E5%B7%A5%E4%BD%9C%E5%AE%A4%E5%A3%B0%E6%98%8E&rsv_dl=0_right_toplist_20811">十年花近百万养蛙</a></span></td>
+            <td class="opr-toplist-right">331606<i class="opr-toplist-st c-icon c-icon-down"></i></td>
+        </tr>
+                                <tr >
+                                                            <td><span><span class="c-index  c-index-hot3 c-gap-icon-right-small">3</span><a target="_blank" title="陈翔工作室声明" href="/s?tn=monline_3_dg&wd=%E9%99%88%E7%BF%94%E5%B7%A5%E4%BD%9C%E5%AE%A4%E5%A3%B0%E6%98%8E&usm=1&ie=utf-8&rsv_cq=%E9%99%88%E7%BF%94%E5%B7%A5%E4%BD%9C%E5%AE%A4%E5%A3%B0%E6%98%8E&rsv_dl=0_right_toplist_20811">陈翔工作室声明</a></span></td>
+            <td class="opr-toplist-right">321559<i class="opr-toplist-st c-icon c-icon-up"></i></td>
+        </tr>
+                                <tr >
+                                                            <td><span><span class="c-index  c-gap-icon-right-small">4</span><a target="_blank" titl

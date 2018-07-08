@@ -1,0 +1,32 @@
+n-chevron-right").addClass("c-icon-chevron-right-gray");$changeBtn.removeClass("opr-toplist-more-currentBtn"),$changeBtn.eq(currentPage).addClass("opr-toplist-more-currentBtn"),e.preventDefault()})});});
+bds.comm.resultPage = 1;
+bds._base64 = {
+     domain : "https://ss0.bdstatic.com/9uN1bjq8AAUYm2zgoY3K/",
+     b64Exp : -1,
+     pdc : 0
+};
+if(bds.comm.supportis){
+    window.__restart_confirm_timeout=true;
+    window.__confirm_timeout=8000;
+    window.__disable_is_guide=true;
+    window.__disable_swap_to_empty=true;
+}
+initPreload({
+    'isui':true,
+    'index_form':"#form",
+    'index_kw':"#kw",
+    'result_form':"#form",
+    'result_kw':"#kw"
+});
+</script>
+
+	
+
+
+	
+		<script type="text/javascript">_WWW_SRV_T =184.56;</script>
+	
+	
+
+</html>
+<!--cxy_ex+1516883075+3526236015+987bbd6ded939f5f11e6d2c2160aa2af--><!--cxy_all+monline_3_dg+d7d5bc5a13faaf9a5cb497cd0de3fc2c+000000000000000000000000000000000195254-->
