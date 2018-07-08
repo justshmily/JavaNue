@@ -6,13 +6,23 @@ package queue;
  */
 public class Queue {
 
-	String[] data=new String[9];
+	String[] data;
 	int head=0;
 	int tail=0;
+	int size=9;
 	
+	public Queue() {
+		data=new String [size];
+	}
+	public Queue(int size) {
+		data=new String [size];
+	}
+	public void setSize(int size) {
+		this.size=size;
+	}
 	//enqueue
 	public void add(String s) {
-		if(tail-head==9)
+		if(tail-head==size)
 			System.out.println("duiman");
 		data[tail++]=s;
 	}
